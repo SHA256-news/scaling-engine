@@ -60,7 +60,7 @@ tools.py      → CLI utilities only (developer tools)
 **Example Structure**:
 ```python
 # API Configuration
-NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
+EVENT_REGISTRY_API_KEY = os.getenv("EVENT_REGISTRY_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
 
@@ -110,10 +110,10 @@ Focus on: {key_points}
 ```python
 def fetch_articles(api_key: str, query: str, from_date: str) -> list:
     """
-    Fetch articles from NewsAPI.
+    Fetch articles from Event Registry.
     
     Args:
-        api_key: NewsAPI authentication key
+        api_key: Event Registry authentication key
         query: Search query string
         from_date: ISO format date string
     
@@ -161,7 +161,7 @@ def main():
     
     # Step 2: Fetch articles
     articles = bot_lib.fetch_articles(
-        config.NEWSAPI_KEY,
+        config.EVENT_REGISTRY_API_KEY,
         config.SEARCH_QUERY,
         get_date_range()
     )
@@ -576,7 +576,7 @@ pip freeze > requirements.txt
 
 Required environment variables (in `.env`):
 ```
-NEWSAPI_KEY=your_newsapi_key_here
+EVENT_REGISTRY_API_KEY=your_event_registry_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
 TWITTER_API_KEY=your_twitter_api_key_here
 TWITTER_API_SECRET=your_twitter_api_secret_here
@@ -628,7 +628,7 @@ jobs:
     
     - name: Run bot
       env:
-        NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+        EVENT_REGISTRY_API_KEY: ${{ secrets.EVENT_REGISTRY_API_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
         TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
