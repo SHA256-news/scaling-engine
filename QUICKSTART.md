@@ -93,14 +93,8 @@ q = QueryArticlesIter(
     lang="eng"
 )
 
-# Request social metrics
-q.setRequestedResult(ReturnInfo(
-    articleInfo=ArticleInfoFlags(
-        title=True,
-        url=True,
-        socialScore=True
-    )
-))
+# Note: QueryArticlesIter returns all fields by default
+# No need to call setRequestedResult()
 
 for article in q.execQuery(er, sortBy="socialScore", maxItems=10):
     score = article.get('socialScore', 0)
@@ -163,17 +157,8 @@ def fetch_bitcoin_news(days_back=7, max_articles=50):
         isDuplicateFilter="skipDuplicates"
     )
     
-    # Configure return info
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            body=True,
-            url=True,
-            date=True,
-            source=True,
-            socialScore=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult()
     
     # Fetch articles with error handling
     articles = []

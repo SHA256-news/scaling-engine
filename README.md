@@ -210,10 +210,12 @@ for article in q.execQuery(er, sortBy="socialScore", maxItems=100):
 
 ### ReturnInfo Configuration
 
-Control what data is returned using `ReturnInfo` and `ArticleInfoFlags`:
+Control what data is returned using `ReturnInfo` and `ArticleInfoFlags`.
+
+**Note**: `QueryArticlesIter` returns all fields by default and does not support `setRequestedResult()`. Use `QueryArticles` with `RequestArticlesInfo` if you need to control which fields are returned:
 
 ```python
-from eventregistry import ReturnInfo, ArticleInfoFlags
+from eventregistry import QueryArticles, RequestArticlesInfo, ReturnInfo, ArticleInfoFlags
 
 # Configure detailed article information
 returnInfo = ReturnInfo(
@@ -236,8 +238,17 @@ returnInfo = ReturnInfo(
     )
 )
 
-# Use in query
-q.setRequestedResult(returnInfo)
+# Use with QueryArticles (not QueryArticlesIter)
+q = QueryArticles(
+    conceptUri="http://en.wikipedia.org/wiki/Bitcoin",
+    lang="eng"
+)
+
+q.setRequestedResult(RequestArticlesInfo(
+    page=1,
+    count=100,
+    returnInfo=returnInfo
+))
 ```
 
 ### Sorting Options
@@ -344,17 +355,8 @@ def fetch_bitcoin_mining_articles(api_key: str, date_start: str, date_end: str, 
         lang="eng"
     )
     
-    # Configure return information
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            body=True,
-            url=True,
-            date=True,
-            concepts=True,
-            socialScore=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult()
     
     # Fetch articles sorted by social score
     articles = []

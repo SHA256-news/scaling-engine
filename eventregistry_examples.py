@@ -200,15 +200,8 @@ def example_return_info_minimal(api_key: str) -> List[Dict]:
         lang="eng"
     )
     
-    # Request only essential fields
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            url=True,
-            date=True,
-            source=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult() as it's not supported
     
     articles = []
     for article in q.execQuery(er, maxItems=10):
@@ -244,18 +237,8 @@ def example_return_info_social_media(api_key: str) -> List[Dict]:
         lang="eng"
     )
     
-    # Request fields for social media
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            body=True,
-            url=True,
-            image=True,
-            socialScore=True,
-            sentiment=True,
-            date=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult() as it's not supported
     
     articles = []
     for article in q.execQuery(er, sortBy="socialScore", maxItems=10):
@@ -289,25 +272,8 @@ def example_return_info_comprehensive(api_key: str) -> List[Dict]:
         lang="eng"
     )
     
-    # Request all fields
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            body=True,
-            url=True,
-            date=True,
-            time=True,
-            authors=True,
-            concepts=True,
-            categories=True,
-            location=True,
-            sentiment=True,
-            image=True,
-            socialScore=True,
-            duplicateList=True,
-            originalArticle=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult() as it's not supported
     
     articles = []
     for article in q.execQuery(er, maxItems=5):
@@ -412,14 +378,8 @@ def example_filtering_by_sentiment(api_key: str) -> List[Dict]:
         lang="eng"
     )
     
-    # Request sentiment data
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            url=True,
-            sentiment=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult() as it's not supported
     
     positive_articles = []
     neutral_articles = []
@@ -499,13 +459,8 @@ def example_sorting_by_social_score(api_key: str) -> List[Dict]:
         lang="eng"
     )
     
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            socialScore=True,
-            url=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult() as it's not supported
     
     articles = []
     for article in q.execQuery(er, sortBy="socialScore", maxItems=10):
@@ -625,12 +580,8 @@ def example_trending_concepts(api_key: str) -> List[str]:
         lang="eng"
     )
     
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            concepts=True,
-            title=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult() as it's not supported
     
     # Count concept frequencies
     concept_counts = {}
@@ -756,20 +707,8 @@ def example_complete_fetcher(api_key: str) -> List[Dict]:
         isDuplicateFilter="skipDuplicates"
     )
     
-    # Configure return info
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            body=True,
-            url=True,
-            date=True,
-            source=True,
-            image=True,
-            socialScore=True,
-            sentiment=True,
-            concepts=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult() as it's not supported
     
     # Fetch articles
     print("Fetching articles...")

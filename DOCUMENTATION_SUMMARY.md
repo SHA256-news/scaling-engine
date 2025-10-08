@@ -247,12 +247,18 @@ for article in q.execQuery(er, sortBy="socialScore", maxItems=1000):
 ```
 
 ### ✓ Custom ReturnInfo Configuration
+**Note**: Use with `QueryArticles` and `RequestArticlesInfo`, not with `QueryArticlesIter`:
 ```python
-q.setRequestedResult(ReturnInfo(
-    articleInfo=ArticleInfoFlags(
-        title=True,
-        body=True,
-        socialScore=True
+q = QueryArticles(conceptUri="...", lang="eng")
+q.setRequestedResult(RequestArticlesInfo(
+    page=1,
+    count=100,
+    returnInfo=ReturnInfo(
+        articleInfo=ArticleInfoFlags(
+            title=True,
+            body=True,
+            socialScore=True
+        )
     )
 ))
 ```
