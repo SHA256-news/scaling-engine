@@ -59,8 +59,10 @@ tmp/
 temp/
 *.tmp
 
-# Article Queue
+# Article Queue and Bot State
 article_queue.json
+posted_articles.json
+daily_brief_cache.json
 
 # Rate Limiter State
 rate_limiter_state.json
