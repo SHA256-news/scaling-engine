@@ -275,6 +275,495 @@ def process_articles(articles: list) -> list:
     return results
 ```
 
+## Event Registry API Best Practices
+
+### Overview
+
+Event Registry is the primary news source for the bot. It provides access to millions of articles from global news sources with powerful semantic search capabilities.
+
+### API Setup
+
+1. **Authentication**: Store API key in environment variable
+   ```python
+   EVENT_REGISTRY_API_KEY = os.getenv("EVENT_REGISTRY_API_KEY")
+   ```
+
+2. **Client Initialization**: Create client once, reuse across requests
+   ```python
+   from eventregistry import EventRegistry
+   
+   er = EventRegistry(apiKey=EVENT_REGISTRY_API_KEY)
+   ```
+
+3. **Rate Limiting**: Implement exponential backoff for rate limit handling
+   ```python
+   import time
+   from eventregistry import EventRegistry
+   
+   def fetch_with_retry(query_func, max_retries=3):
+       for attempt in range(max_retries):
+           try:
+               return query_func()
+           except Exception as e:
+               if "rate limit" in str(e).lower():
+                   wait_time = 2 ** attempt
+                   time.sleep(wait_time)
+               else:
+                   raise
+       raise Exception("Max retries exceeded")
+   ```
+
+### Query Construction with Concept URIs
+
+**Why Use Concept URIs?**
+- More accurate results through semantic understanding
+- Language-agnostic matching
+- Reduces false positives from keyword-only search
+- Better handling of entity variations (e.g., "BTC" vs "Bitcoin")
+
+**Finding Concept URIs**:
+```python
+from eventregistry import EventRegistry
+
+er = EventRegistry(apiKey=api_key)
+
+# Search for concepts
+concepts = er.getConceptUri("Bitcoin")
+# Returns: http://en.wikipedia.org/wiki/Bitcoin
+
+mining_concepts = er.getConceptUri("Mining")
+# Returns: http://en.wikipedia.org/wiki/Mining
+```
+
+**Combining Concepts**:
+```python
+from eventregistry import QueryItems
+
+# AND condition (articles must match ALL concepts)
+bitcoin_mining = QueryItems.AND([
+    "http://en.wikipedia.org/wiki/Bitcoin",
+    "http://en.wikipedia.org/wiki/Mining"
+])
+
+# OR condition (articles can match ANY concept)
+crypto_topics = QueryItems.OR([
+    "http://en.wikipedia.org/wiki/Bitcoin",
+    "http://en.wikipedia.org/wiki/Ethereum",
+    "http://en.wikipedia.org/wiki/Cryptocurrency"
+])
+
+# Complex combinations
+advanced_query = QueryItems.AND([
+    bitcoin_mining,
+    QueryItems.OR(["ASIC", "hashrate", "mining pool"])
+])
+```
+
+### Using QueryArticlesIter for Pagination
+
+**Why QueryArticlesIter?**
+- Automatic pagination handling
+- Memory-efficient iteration
+- Simplified code (no manual page tracking)
+- Built-in error handling
+
+**Basic Usage**:
+```python
+from eventregistry import QueryArticlesIter
+
+q = QueryArticlesIter(
+    conceptUri="http://en.wikipedia.org/wiki/Bitcoin",
+    dateStart="2024-01-01",
+    dateEnd="2024-01-31",
+    lang="eng"
+)
+
+# Iterate through all matching articles
+for article in q.execQuery(er, sortBy="socialScore", maxItems=100):
+    process_article(article)
+```
+
+**Advanced Pagination Control**:
+```python
+# Process in batches
+q = QueryArticlesIter(
+    conceptUri="http://en.wikipedia.org/wiki/Bitcoin",
+    dateStart="2024-01-01",
+    dateEnd="2024-01-31"
+)
+
+batch_size = 25
+articles_processed = 0
+
+for article in q.execQuery(er, sortBy="date", maxItems=100):
+    process_article(article)
+    articles_processed += 1
+    
+    # Process in batches
+    if articles_processed % batch_size == 0:
+        print(f"Processed {articles_processed} articles")
+        time.sleep(1)  # Rate limiting
+```
+
+### ReturnInfo Configuration
+
+**Optimize API Usage**: Only request fields you need
+
+```python
+from eventregistry import ReturnInfo, ArticleInfoFlags
+
+# Minimal info for filtering
+minimal_info = ReturnInfo(
+    articleInfo=ArticleInfoFlags(
+        title=True,
+        url=True,
+        date=True,
+        source=True
+    )
+)
+
+# Full info for content generation
+full_info = ReturnInfo(
+    articleInfo=ArticleInfoFlags(
+        title=True,
+        body=True,
+        url=True,
+        date=True,
+        time=True,
+        authors=True,
+        concepts=True,
+        categories=True,
+        sentiment=True,
+        image=True,
+        socialScore=True,
+        duplicateList=True
+    )
+)
+
+# Apply to query
+q.setRequestedResult(full_info)
+```
+
+**Common Configurations**:
+
+```python
+# For social media posting
+social_media_info = ReturnInfo(
+    articleInfo=ArticleInfoFlags(
+        title=True,
+        body=True,
+        url=True,
+        image=True,
+        socialScore=True,
+        sentiment=True
+    )
+)
+
+# For article filtering
+filter_info = ReturnInfo(
+    articleInfo=ArticleInfoFlags(
+        title=True,
+        url=True,
+        source=True,
+        duplicateList=True
+    )
+)
+
+# For analytics
+analytics_info = ReturnInfo(
+    articleInfo=ArticleInfoFlags(
+        title=True,
+        date=True,
+        concepts=True,
+        categories=True,
+        sentiment=True,
+        socialScore=True
+    )
+)
+```
+
+### Sorting Strategies
+
+**Choose sorting based on use case**:
+
+1. **socialScore**: For viral/trending content
+   - Use when: Finding popular articles for social media
+   - Best for: Engagement-focused content curation
+   ```python
+   for article in q.execQuery(er, sortBy="socialScore", maxItems=50):
+       # Articles with high social media engagement
+       post_to_social_media(article)
+   ```
+
+2. **date**: For latest news
+   - Use when: Time-sensitive updates
+   - Best for: Breaking news, recent developments
+   ```python
+   for article in q.execQuery(er, sortBy="date", maxItems=50):
+       # Most recent articles first
+       send_newsletter(article)
+   ```
+
+3. **rel**: For relevance (default)
+   - Use when: Quality over recency
+   - Best for: Topic research, content discovery
+   ```python
+   for article in q.execQuery(er, sortBy="rel", maxItems=50):
+       # Most relevant to query
+       analyze_content(article)
+   ```
+
+4. **sourceImportance**: For authoritative sources
+   - Use when: Credibility is paramount
+   - Best for: Fact-checking, professional reporting
+   ```python
+   for article in q.execQuery(er, sortBy="sourceImportance", maxItems=50):
+       # From high-authority sources
+       archive_article(article)
+   ```
+
+### Optimization Tips
+
+1. **Narrow Date Ranges**: Use specific date ranges to reduce result set
+   ```python
+   from datetime import datetime, timedelta
+   
+   # Last 24 hours only
+   date_end = datetime.now().strftime("%Y-%m-%d")
+   date_start = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+   
+   q = QueryArticlesIter(
+       conceptUri="http://en.wikipedia.org/wiki/Bitcoin",
+       dateStart=date_start,
+       dateEnd=date_end
+   )
+   ```
+
+2. **Use Specific Concepts**: More specific = fewer false positives
+   ```python
+   # Too broad
+   q = QueryArticlesIter(conceptUri="http://en.wikipedia.org/wiki/Technology")
+   
+   # Better
+   q = QueryArticlesIter(
+       conceptUri=QueryItems.AND([
+           "http://en.wikipedia.org/wiki/Bitcoin",
+           "http://en.wikipedia.org/wiki/Mining"
+       ])
+   )
+   ```
+
+3. **Limit Fields in ReturnInfo**: Smaller payloads = faster responses
+   ```python
+   # Only request what you need
+   q.setRequestedResult(ReturnInfo(
+       articleInfo=ArticleInfoFlags(
+           title=True,
+           url=True,
+           date=True
+           # Don't request body, image, etc. if not needed
+       )
+   ))
+   ```
+
+4. **Cache Results**: Avoid redundant API calls
+   ```python
+   import json
+   from datetime import datetime
+   
+   def fetch_articles_cached(api_key, query_params, cache_file="articles_cache.json"):
+       # Check cache age
+       try:
+           with open(cache_file, 'r') as f:
+               cached = json.load(f)
+               cache_time = datetime.fromisoformat(cached['timestamp'])
+               if (datetime.now() - cache_time).seconds < 3600:  # 1 hour cache
+                   return cached['articles']
+       except FileNotFoundError:
+           pass
+       
+       # Fetch fresh data
+       articles = fetch_articles(api_key, query_params)
+       
+       # Save to cache
+       with open(cache_file, 'w') as f:
+           json.dump({
+               'timestamp': datetime.now().isoformat(),
+               'articles': articles
+           }, f)
+       
+       return articles
+   ```
+
+### Error Handling Patterns
+
+**Common Event Registry Errors**:
+
+```python
+from eventregistry import EventRegistry
+
+def fetch_articles_safe(api_key: str, query_params: dict) -> list:
+    """Fetch articles with comprehensive error handling."""
+    try:
+        er = EventRegistry(apiKey=api_key)
+        
+        q = QueryArticlesIter(**query_params)
+        articles = []
+        
+        for article in q.execQuery(er, sortBy="socialScore", maxItems=100):
+            articles.append(article)
+        
+        return articles
+    
+    except Exception as e:
+        error_message = str(e).lower()
+        
+        # Handle specific errors
+        if "invalid api key" in error_message:
+            logger.error("Invalid Event Registry API key")
+            raise APIError("Authentication failed - check API key")
+        
+        elif "rate limit" in error_message:
+            logger.warning("Rate limit exceeded, implementing backoff")
+            time.sleep(60)  # Wait 1 minute
+            return fetch_articles_safe(api_key, query_params)
+        
+        elif "no results" in error_message:
+            logger.info("No articles found for query")
+            return []
+        
+        else:
+            logger.error(f"Event Registry error: {e}")
+            raise APIError(f"Failed to fetch articles: {e}")
+```
+
+**Retry Logic with Exponential Backoff**:
+
+```python
+def fetch_with_exponential_backoff(fetch_func, max_retries=3):
+    """Execute fetch function with exponential backoff on failure."""
+    for attempt in range(max_retries):
+        try:
+            return fetch_func()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise  # Last attempt, re-raise
+            
+            wait_time = (2 ** attempt) * 1  # 1, 2, 4 seconds
+            logger.warning(f"Attempt {attempt + 1} failed, retrying in {wait_time}s")
+            time.sleep(wait_time)
+```
+
+### Common Patterns for Bitcoin Mining News
+
+**Pattern 1: Trending Bitcoin Mining Articles**
+```python
+def fetch_trending_bitcoin_mining_news(api_key: str, max_articles: int = 50) -> list:
+    """Fetch trending Bitcoin mining articles from the last 7 days."""
+    from datetime import datetime, timedelta
+    
+    er = EventRegistry(apiKey=api_key)
+    
+    date_end = datetime.now().strftime("%Y-%m-%d")
+    date_start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    q = QueryArticlesIter(
+        conceptUri=QueryItems.AND([
+            "http://en.wikipedia.org/wiki/Bitcoin",
+            "http://en.wikipedia.org/wiki/Mining"
+        ]),
+        keywords=QueryItems.OR(["ASIC", "hashrate", "mining pool", "difficulty"]),
+        dateStart=date_start,
+        dateEnd=date_end,
+        lang="eng"
+    )
+    
+    q.setRequestedResult(ReturnInfo(
+        articleInfo=ArticleInfoFlags(
+            title=True,
+            body=True,
+            url=True,
+            socialScore=True,
+            image=True,
+            sentiment=True
+        )
+    ))
+    
+    articles = []
+    for article in q.execQuery(er, sortBy="socialScore", maxItems=max_articles):
+        articles.append(article)
+    
+    return articles
+```
+
+**Pattern 2: Recent Mining Hardware News**
+```python
+def fetch_mining_hardware_news(api_key: str, days_back: int = 3) -> list:
+    """Fetch recent Bitcoin mining hardware announcements."""
+    from datetime import datetime, timedelta
+    
+    er = EventRegistry(apiKey=api_key)
+    
+    date_end = datetime.now().strftime("%Y-%m-%d")
+    date_start = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    
+    q = QueryArticlesIter(
+        conceptUri="http://en.wikipedia.org/wiki/Bitcoin",
+        keywords=QueryItems.OR([
+            "ASIC miner",
+            "Antminer",
+            "Whatsminer",
+            "mining hardware",
+            "hashrate"
+        ]),
+        dateStart=date_start,
+        dateEnd=date_end,
+        lang="eng"
+    )
+    
+    articles = []
+    for article in q.execQuery(er, sortBy="date", maxItems=30):
+        articles.append(article)
+    
+    return articles
+```
+
+**Pattern 3: Regulatory News Affecting Mining**
+```python
+def fetch_mining_regulatory_news(api_key: str, max_articles: int = 25) -> list:
+    """Fetch news about regulations affecting Bitcoin mining."""
+    from datetime import datetime, timedelta
+    
+    er = EventRegistry(apiKey=api_key)
+    
+    date_end = datetime.now().strftime("%Y-%m-%d")
+    date_start = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+    
+    q = QueryArticlesIter(
+        conceptUri=QueryItems.AND([
+            "http://en.wikipedia.org/wiki/Bitcoin",
+            "http://en.wikipedia.org/wiki/Mining"
+        ]),
+        keywords=QueryItems.OR([
+            "regulation",
+            "ban",
+            "legal",
+            "government",
+            "policy",
+            "energy"
+        ]),
+        dateStart=date_start,
+        dateEnd=date_end,
+        lang="eng"
+    )
+    
+    articles = []
+    for article in q.execQuery(er, sortBy="sourceImportance", maxItems=max_articles):
+        articles.append(article)
+    
+    return articles
+```
+
 ## Gemini API Implementation Guidelines
 
 ### API Setup
