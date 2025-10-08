@@ -58,3 +58,9 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Article Queue
+article_queue.json
+
+# Rate Limiter State
+rate_limiter_state.json
