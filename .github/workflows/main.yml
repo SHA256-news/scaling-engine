@@ -49,6 +49,14 @@ jobs:
           EVENT_REGISTRY_API_KEY: ${{ secrets.EVENT_REGISTRY_API_KEY }}
         run: python main.py --workflow monitor
 
+      - name: Commit and Push Queue Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add article_queue.json daily_brief_cache.json || true
+          git diff --staged --quiet || git commit -m "Update article queue from monitor workflow [skip ci]"
+          git push || true
+
   # Job 2: Posting Workflow
   post:
     name: 🐦 Post to Twitter
@@ -79,6 +87,14 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: python main.py --workflow post
 
+      - name: Commit and Push Queue Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add article_queue.json posted_articles.json || true
+          git diff --staged --quiet || git commit -m "Update article queue and posted articles from post workflow [skip ci]"
+          git push || true
+
   # Job 3: Daily Brief Workflow
   daily-brief:
     name: 📚 Generate Daily Brief
@@ -104,3 +120,11 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python main.py --workflow daily-brief
+
+      - name: Commit and Push Cache Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add daily_brief_cache.json || true
+          git diff --staged --quiet || git commit -m "Update daily brief cache from daily-brief workflow [skip ci]"
+          git push || true
