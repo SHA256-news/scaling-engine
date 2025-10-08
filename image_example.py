@@ -15,7 +15,7 @@ Requirements:
 
 import os
 from dotenv import load_dotenv
-from bot_lib_template import (
+from bot_lib import (
     fetch_unsplash_images,
     download_image,
     optimize_image_for_twitter,
