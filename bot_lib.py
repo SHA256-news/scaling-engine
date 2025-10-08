@@ -277,7 +277,8 @@ def filter_articles(
     blacklisted_sources: List[str],
     blacklisted_keywords: List[str],
     min_social_score: float = 0.0,
-    min_sentiment: float = -1.0
+    min_sentiment: float = -1.0,
+    min_length: int = 0
 ) -> List[Dict]:
     """
     Filter articles based on quality criteria.
@@ -291,7 +292,8 @@ def filter_articles(
     2. Blacklisted keywords - Skip articles containing spam indicators
     3. Minimum social score - Ensure minimum engagement level
     4. Minimum sentiment - Filter out extremely negative articles
-    5. Required fields - Ensure article has title, URL, and body
+    5. Minimum article length - Filter out very short articles
+    6. Required fields - Ensure article has title, URL, and body
     
     Args:
         articles: List of article dictionaries to filter
@@ -299,6 +301,7 @@ def filter_articles(
         blacklisted_keywords: List of keywords to exclude (e.g., ["clickbait", "sponsored"])
         min_social_score: Minimum social score threshold (default: 0.0)
         min_sentiment: Minimum sentiment score, -1 to 1 (default: -1.0)
+        min_length: Minimum article body length in characters (default: 0)
     
     Returns:
         Filtered list of article dictionaries that pass all criteria
@@ -351,6 +354,11 @@ def filter_articles(
         # Check sentiment threshold
         sentiment = article.get('sentiment', 0)
         if sentiment < min_sentiment:
+            continue
+        
+        # Check minimum article length
+        body_length = len(article.get('body', ''))
+        if body_length < min_length:
             continue
         
         filtered.append(article)
