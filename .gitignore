@@ -60,9 +60,10 @@ temp/
 *.tmp
 
 # Article Queue and Bot State
-article_queue.json
-posted_articles.json
-daily_brief_cache.json
+# These files are now committed to persist state between GitHub Actions runs
+# article_queue.json
+# posted_articles.json
+# daily_brief_cache.json
 
 # Rate Limiter State
 rate_limiter_state.json
