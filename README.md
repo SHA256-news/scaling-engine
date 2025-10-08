@@ -108,6 +108,7 @@ The **scaling-engine** repository implements a **Bitcoin Mining News Bot** with 
 | **Gemini (Google AI)** | Generate tweets and daily briefs | `GEMINI_API_KEY` |
 | **Twitter** | Post scheduled updates | `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_SECRET` |
 | **GitHub** | Create issues for daily briefs | `GITHUB_TOKEN` |
+| **Unsplash** | Fetch royalty-free images for tweets | `UNSPLASH_ACCESS_KEY` |
 
 ### Design Philosophy
 
@@ -368,4 +369,156 @@ def fetch_bitcoin_mining_articles(api_key: str, date_start: str, date_end: str, 
 - [Event Registry Documentation](https://eventregistry.org/documentation)
 - [Python SDK GitHub](https://github.com/EventRegistry/event-registry-python)
 - [API Reference](https://eventregistry.org/documentation/api)
+
+## Unsplash Image Integration
+
+The bot automatically fetches and optimizes royalty-free images from Unsplash to accompany tweets, making the content more engaging and visually appealing.
+
+### Features
+
+- **Automated Image Fetching**: Searches Unsplash API for Bitcoin mining related imagery
+- **Image Optimization**: Resizes images to Twitter's recommended specs (1600x900 pixels, 16:9 aspect ratio)
+- **Quality Control**: Intelligent cropping to maintain best composition
+- **Media Attachments**: Posts up to 2 relevant images per tweet
+- **Free Usage**: All images are royalty-free under Unsplash License
+
+### Setup and Authentication
+
+1. **Get an Unsplash API Key**:
+   - Sign up at [Unsplash Developers](https://unsplash.com/developers)
+   - Create a new application
+   - Copy your Access Key
+   - Store it in your `.env` file: `UNSPLASH_ACCESS_KEY=your_access_key_here`
+
+2. **Install Dependencies**:
+```bash
+pip install requests Pillow
+```
+
+### Usage
+
+The bot provides four main functions for image handling:
+
+#### 1. Fetch Images from Unsplash
+
+```python
+from bot_lib import fetch_unsplash_images
+
+images = fetch_unsplash_images(
+    unsplash_access_key=UNSPLASH_ACCESS_KEY,
+    query="bitcoin mining",
+    count=2,
+    orientation="landscape"
+)
+
+# Returns list of image dictionaries with URLs and metadata
+for image in images:
+    print(f"Image: {image['url']}")
+    print(f"Photographer: {image['photographer']}")
+```
+
+#### 2. Download Image
+
+```python
+from bot_lib import download_image
+
+path = download_image(
+    image_url="https://images.unsplash.com/photo-123...",
+    output_path="/tmp/bitcoin_mining.jpg"
+)
+```
+
+#### 3. Optimize for Twitter
+
+```python
+from bot_lib import optimize_image_for_twitter
+
+optimized_path = optimize_image_for_twitter(
+    input_path="/tmp/bitcoin_mining.jpg",
+    target_size=(1600, 900),  # Twitter recommended specs
+    quality=85
+)
+```
+
+#### 4. Complete Workflow
+
+```python
+from bot_lib import fetch_and_prepare_images
+
+# Fetch, download, and optimize in one step
+image_paths = fetch_and_prepare_images(
+    unsplash_access_key=UNSPLASH_ACCESS_KEY,
+    query="bitcoin mining hardware",
+    output_dir="/tmp/bitcoin_images",
+    count=2
+)
+
+# Returns list of paths to Twitter-ready images
+print(f"Prepared {len(image_paths)} images")
+```
+
+### Post Tweet with Images
+
+```python
+from bot_lib import post_to_twitter, fetch_and_prepare_images
+
+# Fetch and prepare images
+image_paths = fetch_and_prepare_images(
+    unsplash_access_key=UNSPLASH_ACCESS_KEY,
+    query="bitcoin mining",
+    count=2
+)
+
+# Post to Twitter with images
+result = post_to_twitter(
+    twitter_api_key=TWITTER_API_KEY,
+    twitter_api_secret=TWITTER_API_SECRET,
+    access_token=TWITTER_ACCESS_TOKEN,
+    access_token_secret=TWITTER_ACCESS_SECRET,
+    content="🚀 Bitcoin Mining Update! #Bitcoin #Mining",
+    media_paths=image_paths
+)
+
+if result['success']:
+    print(f"Posted: {result['url']}")
+    print(f"Media IDs: {result['media_ids']}")
+```
+
+### Image Optimization Specs
+
+The bot optimizes images according to Twitter's best practices:
+
+- **Aspect Ratio**: 16:9 (1600x900 pixels)
+- **File Format**: JPEG (optimal for photos)
+- **Quality**: 85% (balanced quality/size)
+- **Max File Size**: Under 5MB per image
+- **Max Images**: Up to 4 per tweet (default: 2)
+
+### Rate Limits and Best Practices
+
+**Unsplash API Limits** (Free Tier):
+- 50 requests per hour
+- Recommended: Cache images when possible
+- Use specific search queries for better results
+
+**Best Practices**:
+1. Use descriptive search queries related to article content
+2. Cache images to avoid repeated API calls
+3. Always credit photographers (included in metadata)
+4. Clean up temporary files after posting
+5. Handle API errors gracefully with fallbacks
+
+### Troubleshooting
+
+**Problem**: No images returned
+- **Solution**: Try broader search queries, check API key validity
+
+**Problem**: Images look cropped incorrectly
+- **Solution**: Adjust `target_size` parameter or use different orientation
+
+**Problem**: File size too large
+- **Solution**: Reduce `quality` parameter (try 75-80)
+
+**Problem**: ImportError for PIL/Pillow
+- **Solution**: Install Pillow: `pip install Pillow`
 - [Concept Search Guide](https://github.com/EventRegistry/event-registry-python/wiki/Concepts)
