@@ -440,8 +440,13 @@ full_info = ReturnInfo(
     )
 )
 
-# Apply to query
-q.setRequestedResult(full_info)
+# Apply to query (only works with QueryArticles, not QueryArticlesIter)
+q = QueryArticles(conceptUri="...", lang="eng")
+q.setRequestedResult(RequestArticlesInfo(
+    page=1,
+    count=100,
+    returnInfo=full_info
+))
 ```
 
 **Common Configurations**:
@@ -553,17 +558,16 @@ analytics_info = ReturnInfo(
    )
    ```
 
-3. **Limit Fields in ReturnInfo**: Smaller payloads = faster responses
+3. **Note on QueryArticlesIter**: It returns all fields by default
    ```python
-   # Only request what you need
-   q.setRequestedResult(ReturnInfo(
-       articleInfo=ArticleInfoFlags(
-           title=True,
-           url=True,
-           date=True
-           # Don't request body, image, etc. if not needed
-       )
-   ))
+   # QueryArticlesIter simplifies usage - no need to configure ReturnInfo
+   q = QueryArticlesIter(
+       conceptUri="http://en.wikipedia.org/wiki/Bitcoin",
+       lang="eng"
+   )
+   # Just use it - all fields are returned automatically
+   for article in q.execQuery(er, maxItems=100):
+       process(article)
    ```
 
 4. **Cache Results**: Avoid redundant API calls
@@ -678,16 +682,8 @@ def fetch_trending_bitcoin_mining_news(api_key: str, max_articles: int = 50) -> 
         lang="eng"
     )
     
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            body=True,
-            url=True,
-            socialScore=True,
-            image=True,
-            sentiment=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult()
     
     articles = []
     for article in q.execQuery(er, sortBy="socialScore", maxItems=max_articles):

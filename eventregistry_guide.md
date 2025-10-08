@@ -482,6 +482,42 @@ comprehensive = ReturnInfo(
 
 ### Applying ReturnInfo
 
+**Note**: `QueryArticlesIter` returns all fields by default and does not support `setRequestedResult()` with `ReturnInfo`.
+
+If you need to control which fields are returned, use `QueryArticles` with `RequestArticlesInfo`:
+
+```python
+from eventregistry import QueryArticles, RequestArticlesInfo, ReturnInfo, ArticleInfoFlags
+
+q = QueryArticles(
+    conceptUri="http://en.wikipedia.org/wiki/Bitcoin",
+    lang="eng"
+)
+
+# Set return info with RequestArticlesInfo
+social_media = ReturnInfo(
+    articleInfo=ArticleInfoFlags(
+        title=True,
+        body=True,
+        url=True,
+        image=True,
+        socialScore=True
+    )
+)
+
+q.setRequestedResult(RequestArticlesInfo(
+    page=1,
+    count=100,
+    returnInfo=social_media
+))
+
+# Execute query
+res = er.execQuery(q)
+articles = res['articles']['results']
+```
+
+For `QueryArticlesIter` (iterator approach), simply omit `setRequestedResult()`:
+
 ```python
 from eventregistry import QueryArticlesIter
 
@@ -490,10 +526,7 @@ q = QueryArticlesIter(
     lang="eng"
 )
 
-# Set return info
-q.setRequestedResult(social_media)
-
-# Execute query
+# Execute query - all fields returned by default
 for article in q.execQuery(er, maxItems=100):
     print(article)
 ```
@@ -902,18 +935,8 @@ def fetch_trending_mining_articles(api_key: str, days_back: int = 7) -> list:
         lang="eng"
     )
     
-    # Request social metrics
-    q.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,
-            body=True,
-            url=True,
-            image=True,
-            socialScore=True,
-            sentiment=True,
-            date=True
-        )
-    ))
+    # Note: QueryArticlesIter returns all fields by default
+    # No need to call setRequestedResult()
     
     articles = []
     for article in q.execQuery(er, sortBy="socialScore", maxItems=25):
@@ -1162,22 +1185,8 @@ class BitcoinMiningNewsAggregator:
             isDuplicateFilter="skipDuplicates"
         )
         
-        # Configure return information
-        q.setRequestedResult(ReturnInfo(
-            articleInfo=ArticleInfoFlags(
-                title=True,
-                body=True,
-                url=True,
-                date=True,
-                time=True,
-                source=True,
-                authors=True,
-                concepts=True,
-                sentiment=True,
-                image=True,
-                socialScore=True
-            )
-        ))
+        # Note: QueryArticlesIter returns all fields by default
+        # No need to call setRequestedResult()
         
         # Fetch articles
         articles = []
