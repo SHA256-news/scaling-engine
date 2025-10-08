@@ -64,3 +64,9 @@ article_queue.json
 
 # Rate Limiter State
 rate_limiter_state.json
+
+# Downloaded/Optimized Images
+*_raw.jpg
+*_optimized.jpg
+bitcoin_images/
+bitcoin_images_*/

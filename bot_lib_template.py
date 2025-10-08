@@ -5,7 +5,8 @@ This module contains all stateless functions for the bot's business logic:
 - Fetching news articles from Event Registry
 - Filtering content based on quality criteria
 - AI content generation
-- Social media posting
+- Image fetching and optimization (Unsplash API integration)
+- Social media posting with media attachments
 - Utility functions for data processing
 
 Design Principles:
@@ -19,8 +20,10 @@ See agent.md for complete architecture guidelines.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import time
+import os
+import io
 
 
 # =============================================================================
@@ -455,6 +458,318 @@ def generate_social_media_content(
 
 
 # =============================================================================
+# Image Fetching and Optimization Functions
+# =============================================================================
+
+def fetch_unsplash_images(
+    unsplash_access_key: str,
+    query: str,
+    count: int = 2,
+    orientation: str = "landscape"
+) -> List[Dict]:
+    """
+    Fetch images from Unsplash API related to a search query.
+    
+    Retrieves free, royalty-free images from Unsplash based on the query.
+    Perfect for Bitcoin mining related imagery.
+    
+    Args:
+        unsplash_access_key: Unsplash API access key
+        query: Search query (e.g., "bitcoin mining", "cryptocurrency")
+        count: Number of images to fetch (default: 2, max: 30)
+        orientation: Image orientation - "landscape", "portrait", or "squarish"
+    
+    Returns:
+        List of image dictionaries with structure:
+        [
+            {
+                'id': str,              # Unique image ID
+                'url': str,             # Full resolution image URL
+                'download_url': str,    # Download link
+                'width': int,           # Original width
+                'height': int,          # Original height
+                'description': str,     # Image description
+                'alt_description': str, # Alt text
+                'photographer': str,    # Photographer name
+                'photographer_url': str # Photographer profile URL
+            },
+            ...
+        ]
+    
+    Raises:
+        ValueError: If count exceeds 30 or is less than 1
+        APIError: If Unsplash API call fails
+    
+    Example:
+        >>> images = fetch_unsplash_images(
+        ...     unsplash_key,
+        ...     query="bitcoin mining",
+        ...     count=2
+        ... )
+        >>> print(f"Fetched {len(images)} images")
+        Fetched 2 images
+        >>> print(images[0]['photographer'])
+        'John Doe'
+    
+    Notes:
+        - All images are free to use under Unsplash License
+        - Always credit photographer when possible
+        - API rate limit: 50 requests/hour (free tier)
+        - Use specific queries for better results
+    """
+    import requests
+    
+    if count < 1 or count > 30:
+        raise ValueError("Count must be between 1 and 30")
+    
+    # Unsplash API endpoint
+    url = "https://api.unsplash.com/search/photos"
+    
+    headers = {
+        "Authorization": f"Client-ID {unsplash_access_key}"
+    }
+    
+    params = {
+        "query": query,
+        "per_page": count,
+        "orientation": orientation
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        images = []
+        for result in data.get('results', []):
+            images.append({
+                'id': result.get('id'),
+                'url': result.get('urls', {}).get('full'),
+                'download_url': result.get('urls', {}).get('raw'),
+                'width': result.get('width'),
+                'height': result.get('height'),
+                'description': result.get('description', ''),
+                'alt_description': result.get('alt_description', ''),
+                'photographer': result.get('user', {}).get('name', 'Unknown'),
+                'photographer_url': result.get('user', {}).get('links', {}).get('html', '')
+            })
+        
+        return images
+    
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Unsplash API error: {e}")
+
+
+def download_image(image_url: str, output_path: str) -> str:
+    """
+    Download an image from a URL to local storage.
+    
+    Args:
+        image_url: URL of the image to download
+        output_path: Local path where image will be saved
+    
+    Returns:
+        Path to the downloaded image file
+    
+    Raises:
+        IOError: If download or file write fails
+    
+    Example:
+        >>> path = download_image(
+        ...     "https://images.unsplash.com/photo-123",
+        ...     "/tmp/bitcoin_mining.jpg"
+        ... )
+        >>> print(f"Downloaded to: {path}")
+        Downloaded to: /tmp/bitcoin_mining.jpg
+    """
+    import requests
+    
+    try:
+        response = requests.get(image_url, timeout=30)
+        response.raise_for_status()
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        with open(output_path, 'wb') as f:
+            f.write(response.content)
+        
+        return output_path
+    
+    except requests.exceptions.RequestException as e:
+        raise IOError(f"Failed to download image: {e}")
+
+
+def optimize_image_for_twitter(
+    input_path: str,
+    output_path: Optional[str] = None,
+    target_size: Tuple[int, int] = (1600, 900),
+    quality: int = 85
+) -> str:
+    """
+    Optimize an image for Twitter posting.
+    
+    Resizes and compresses images to Twitter's recommended specifications:
+    - Aspect ratio: 16:9 (1600x900 pixels)
+    - Maximum file size: 5MB
+    - Format: JPEG for photos, PNG for graphics
+    
+    Args:
+        input_path: Path to the input image
+        output_path: Path for optimized image (defaults to input_path with _optimized suffix)
+        target_size: Target dimensions as (width, height) tuple (default: 1600x900)
+        quality: JPEG quality 1-100 (default: 85)
+    
+    Returns:
+        Path to the optimized image file
+    
+    Raises:
+        FileNotFoundError: If input image doesn't exist
+        ValueError: If image cannot be processed
+    
+    Example:
+        >>> optimized = optimize_image_for_twitter(
+        ...     "/tmp/bitcoin.jpg",
+        ...     target_size=(1600, 900),
+        ...     quality=85
+        ... )
+        >>> print(f"Optimized: {optimized}")
+        Optimized: /tmp/bitcoin_optimized.jpg
+    
+    Notes:
+        - Maintains aspect ratio by cropping to fit
+        - Centers crop for best composition
+        - Reduces file size while maintaining quality
+        - Twitter supports up to 4 images per tweet
+    """
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        raise ImportError("Pillow library required: pip install Pillow")
+    
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Input image not found: {input_path}")
+    
+    # Generate output path if not provided
+    if output_path is None:
+        base, ext = os.path.splitext(input_path)
+        output_path = f"{base}_optimized{ext}"
+    
+    try:
+        # Open and process image
+        with Image.open(input_path) as img:
+            # Convert to RGB if necessary (handles RGBA, P, etc.)
+            if img.mode not in ('RGB', 'L'):
+                img = img.convert('RGB')
+            
+            # Calculate dimensions to fit target aspect ratio
+            target_width, target_height = target_size
+            target_aspect = target_width / target_height
+            current_aspect = img.width / img.height
+            
+            if current_aspect > target_aspect:
+                # Image is wider - crop width
+                new_width = int(img.height * target_aspect)
+                left = (img.width - new_width) // 2
+                img = img.crop((left, 0, left + new_width, img.height))
+            elif current_aspect < target_aspect:
+                # Image is taller - crop height
+                new_height = int(img.width / target_aspect)
+                top = (img.height - new_height) // 2
+                img = img.crop((0, top, img.width, top + new_height))
+            
+            # Resize to target dimensions
+            img = img.resize(target_size, Image.Resampling.LANCZOS)
+            
+            # Save optimized image
+            img.save(output_path, 'JPEG', quality=quality, optimize=True)
+        
+        return output_path
+    
+    except Exception as e:
+        raise ValueError(f"Failed to optimize image: {e}")
+
+
+def fetch_and_prepare_images(
+    unsplash_access_key: str,
+    query: str,
+    output_dir: str = "/tmp/bitcoin_images",
+    count: int = 2
+) -> List[str]:
+    """
+    Fetch images from Unsplash and prepare them for Twitter posting.
+    
+    Complete workflow:
+    1. Search Unsplash for relevant images
+    2. Download images to local storage
+    3. Optimize images to Twitter specifications
+    
+    Args:
+        unsplash_access_key: Unsplash API access key
+        query: Search query for images
+        output_dir: Directory to store downloaded images
+        count: Number of images to fetch (default: 2)
+    
+    Returns:
+        List of paths to optimized images ready for Twitter posting
+    
+    Raises:
+        Exception: If image fetching or processing fails
+    
+    Example:
+        >>> image_paths = fetch_and_prepare_images(
+        ...     unsplash_key,
+        ...     query="bitcoin mining hardware",
+        ...     count=2
+        ... )
+        >>> print(f"Prepared {len(image_paths)} images")
+        Prepared 2 images
+        >>> for path in image_paths:
+        ...     print(f"  - {path}")
+          - /tmp/bitcoin_images/image_1_optimized.jpg
+          - /tmp/bitcoin_images/image_2_optimized.jpg
+    
+    Notes:
+        - Creates output directory if it doesn't exist
+        - Automatically cleans up raw downloads
+        - Returns empty list if no images found
+        - Safe to use in automated workflows
+    """
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Fetch images from Unsplash
+    images = fetch_unsplash_images(unsplash_access_key, query, count)
+    
+    if not images:
+        return []
+    
+    optimized_paths = []
+    
+    for i, image in enumerate(images):
+        try:
+            # Download image
+            raw_path = os.path.join(output_dir, f"image_{i+1}_raw.jpg")
+            download_image(image['download_url'], raw_path)
+            
+            # Optimize for Twitter
+            optimized_path = os.path.join(output_dir, f"image_{i+1}_optimized.jpg")
+            optimize_image_for_twitter(raw_path, optimized_path)
+            
+            optimized_paths.append(optimized_path)
+            
+            # Clean up raw image
+            if os.path.exists(raw_path):
+                os.remove(raw_path)
+        
+        except Exception as e:
+            print(f"Warning: Failed to process image {i+1}: {e}")
+            continue
+    
+    return optimized_paths
+
+
+# =============================================================================
 # Social Media Posting Functions (Placeholder)
 # =============================================================================
 
@@ -463,10 +778,11 @@ def post_to_twitter(
     twitter_api_secret: str,
     access_token: str,
     access_token_secret: str,
-    content: str
+    content: str,
+    media_paths: Optional[List[str]] = None
 ) -> Dict:
     """
-    Post content to Twitter.
+    Post content to Twitter with optional image attachments.
     
     Args:
         twitter_api_key: Twitter API key
@@ -474,6 +790,7 @@ def post_to_twitter(
         access_token: Twitter access token
         access_token_secret: Twitter access token secret
         content: Tweet content (max 280 characters)
+        media_paths: Optional list of paths to image files (max 4 images)
     
     Returns:
         Dictionary with post details:
@@ -481,22 +798,47 @@ def post_to_twitter(
             'success': bool,
             'tweet_id': str,
             'url': str,
+            'media_ids': List[str],  # IDs of uploaded media
             'error': Optional[str]
         }
     
     Raises:
-        ValueError: If content exceeds 280 characters
+        ValueError: If content exceeds 280 characters or more than 4 images
         APIError: If Twitter API call fails
     
     Example:
+        >>> # Post with text only
         >>> result = post_to_twitter(
         ...     api_key, api_secret, token, token_secret,
         ...     "🚀 Bitcoin Mining Update! #Bitcoin #Mining"
         ... )
+        >>> 
+        >>> # Post with images
+        >>> image_paths = fetch_and_prepare_images(unsplash_key, "bitcoin mining", count=2)
+        >>> result = post_to_twitter(
+        ...     api_key, api_secret, token, token_secret,
+        ...     "🚀 Bitcoin Mining Update! #Bitcoin #Mining",
+        ...     media_paths=image_paths
+        ... )
         >>> if result['success']:
         ...     print(f"Posted: {result['url']}")
+        ...     print(f"Media IDs: {result['media_ids']}")
+    
+    Notes:
+        - Twitter supports up to 4 images per tweet
+        - Images must be under 5MB each
+        - Supported formats: JPEG, PNG, GIF, WEBP
+        - Media is uploaded before tweet is posted
     """
-    # TODO: Implement Twitter API integration
+    if media_paths and len(media_paths) > 4:
+        raise ValueError("Twitter supports maximum 4 images per tweet")
+    
+    # TODO: Implement Twitter API integration with media upload
+    # Steps:
+    # 1. Upload media files using Twitter media upload API
+    # 2. Get media IDs from upload response
+    # 3. Create tweet with media IDs attached
+    # 4. Return success status with tweet and media details
     pass
 
 
@@ -658,3 +1000,41 @@ if __name__ == "__main__":
     # Save to file
     save_articles_to_json(filtered_articles, "bitcoin_mining_articles.json")
     print("\n✓ Saved articles to bitcoin_mining_articles.json")
+    
+    # Example: Fetch and prepare images for Bitcoin mining content
+    UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+    
+    if UNSPLASH_ACCESS_KEY and filtered_articles:
+        print("\n" + "="*80)
+        print("Fetching and optimizing images...")
+        print("="*80)
+        
+        # Use the first article's title/concepts for image search
+        article = filtered_articles[0]
+        search_query = "bitcoin mining"  # Could be derived from article content
+        
+        try:
+            image_paths = fetch_and_prepare_images(
+                unsplash_access_key=UNSPLASH_ACCESS_KEY,
+                query=search_query,
+                output_dir="/tmp/bitcoin_images",
+                count=2
+            )
+            
+            print(f"\n✓ Prepared {len(image_paths)} images for Twitter posting:")
+            for i, path in enumerate(image_paths, 1):
+                file_size = os.path.getsize(path) / 1024  # KB
+                print(f"   {i}. {path} ({file_size:.1f} KB)")
+            
+            # Example: Post to Twitter with images
+            # result = post_to_twitter(
+            #     twitter_api_key=TWITTER_API_KEY,
+            #     twitter_api_secret=TWITTER_API_SECRET,
+            #     access_token=TWITTER_ACCESS_TOKEN,
+            #     access_token_secret=TWITTER_ACCESS_SECRET,
+            #     content="🚀 Bitcoin Mining Update! #Bitcoin #Mining",
+            #     media_paths=image_paths
+            # )
+            
+        except Exception as e:
+            print(f"\n✗ Error fetching/preparing images: {e}")
