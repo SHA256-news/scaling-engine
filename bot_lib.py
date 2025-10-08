@@ -134,6 +134,7 @@ def fetch_bitcoin_mining_articles(
     
     # Create query with concept-based search
     # AND condition ensures articles match BOTH Bitcoin AND Mining
+    # Note: QueryArticlesIter returns all fields by default, so no need to call setRequestedResult
     query = QueryArticlesIter(
         conceptUri=QueryItems.AND([
             bitcoin_concept,
@@ -154,23 +155,6 @@ def fetch_bitcoin_mining_articles(
         lang="eng",  # English only
         isDuplicateFilter="skipDuplicates"  # Skip duplicate articles
     )
-    
-    # Configure what data to return
-    # Only request fields we'll use to minimize payload size
-    query.setRequestedResult(ReturnInfo(
-        articleInfo=ArticleInfoFlags(
-            title=True,           # Article headline
-            body=True,            # Full article text
-            url=True,             # Article URL
-            date=True,            # Publication date
-            time=True,            # Publication time
-            source=True,          # Source information
-            image=True,           # Article image
-            socialScore=True,     # Social media engagement
-            sentiment=True,       # Sentiment analysis
-            concepts=True         # Related concepts
-        )
-    ))
     
     # Fetch articles sorted by social engagement
     # Higher social score = more viral/trending content
