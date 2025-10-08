@@ -25,6 +25,9 @@ import time
 import os
 import io
 
+# Import BitcoinMiningFilter
+from src.services.filtering import BitcoinMiningFilter
+
 
 # =============================================================================
 # Event Registry Integration Functions
@@ -278,7 +281,8 @@ def filter_articles(
     blacklisted_keywords: List[str],
     min_social_score: float = 0.0,
     min_sentiment: float = -1.0,
-    min_length: int = 0
+    min_length: int = 0,
+    min_mining_terms: int = 2
 ) -> List[Dict]:
     """
     Filter articles based on quality criteria.
@@ -294,6 +298,7 @@ def filter_articles(
     4. Minimum sentiment - Filter out extremely negative articles
     5. Minimum article length - Filter out very short articles
     6. Required fields - Ensure article has title, URL, and body
+    7. Mining relevance - Ensure articles contain mining-related keywords
     
     Args:
         articles: List of article dictionaries to filter
@@ -302,6 +307,7 @@ def filter_articles(
         min_social_score: Minimum social score threshold (default: 0.0)
         min_sentiment: Minimum sentiment score, -1 to 1 (default: -1.0)
         min_length: Minimum article body length in characters (default: 0)
+        min_mining_terms: Minimum number of mining-related keywords required (default: 2)
     
     Returns:
         Filtered list of article dictionaries that pass all criteria
@@ -315,7 +321,8 @@ def filter_articles(
         ...     blacklist_sources,
         ...     blacklist_keywords,
         ...     min_social_score=5.0,
-        ...     min_sentiment=-0.5
+        ...     min_sentiment=-0.5,
+        ...     min_mining_terms=2
         ... )
         >>> print(f"Filtered from {len(articles)} to {len(filtered)} articles")
         Filtered from 100 to 42 articles
@@ -327,6 +334,9 @@ def filter_articles(
         - Preserves original article order
     """
     filtered = []
+    
+    # Initialize the mining filter
+    mining_filter = BitcoinMiningFilter(min_mining_terms=min_mining_terms)
     
     for article in articles:
         # Check required fields
@@ -359,6 +369,10 @@ def filter_articles(
         # Check minimum article length
         body_length = len(article.get('body', ''))
         if body_length < min_length:
+            continue
+        
+        # Check mining relevance using BitcoinMiningFilter
+        if not mining_filter._is_mining_relevant(article):
             continue
         
         filtered.append(article)
