@@ -1,0 +1,36 @@
+name: Debug - Capture Raw Article Data
+
+on:
+  workflow_dispatch: # Allows you to run this workflow manually
+
+jobs:
+  capture-raw-data:
+    runs-on: ubuntu-latest
+    
+    # Grant permissions to read the repository and write to artifacts
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run script to capture raw articles
+        env:
+          EVENT_REGISTRY_API_KEY: ${{ secrets.EVENT_REGISTRY_API_KEY }}
+        run: python debug_fetch_articles.py
+
+      - name: Upload raw articles as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-article-data
+          path: raw_articles.json
